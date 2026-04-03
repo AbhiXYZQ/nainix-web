@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { randomBytes, scryptSync } from 'crypto';
-import { getDatabase } from '@/lib/db/mongodb';
+import { getSupabase } from '@/lib/db/supabase';
 
 function hashPassword(password) {
   const salt = randomBytes(16).toString('hex');
@@ -10,79 +10,48 @@ function hashPassword(password) {
 
 export async function POST(request) {
   try {
-    const body = await request.json();
+    const body             = await request.json();
     const { token, password } = body || {};
 
     if (!token || typeof token !== 'string') {
-      return NextResponse.json(
-        { success: false, message: 'Reset token is missing or invalid.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: 'Reset token is missing or invalid.' }, { status: 400 });
     }
-
     if (!password || password.length < 6) {
-      return NextResponse.json(
-        { success: false, message: 'Password must be at least 6 characters.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: 'Password must be at least 6 characters.' }, { status: 400 });
     }
 
-    const db = await getDatabase();
-    const tokensCollection = db.collection('passwordResetTokens');
-    const usersCollection = db.collection('users');
+    const supabase = getSupabase();
 
-    // Find the token record
-    const tokenRecord = await tokensCollection.findOne({ token });
+    const { data: tokenRecord } = await supabase
+      .from('password_reset_tokens')
+      .select('*')
+      .eq('token', token)
+      .maybeSingle();
 
     if (!tokenRecord) {
-      return NextResponse.json(
-        { success: false, message: 'Reset link is invalid or has already been used.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: 'Reset link is invalid or has already been used.' }, { status: 400 });
     }
 
-    // Check expiry
-    if (new Date() > new Date(tokenRecord.expiresAt)) {
-      await tokensCollection.deleteOne({ token });
-      return NextResponse.json(
-        { success: false, message: 'Reset link has expired. Please request a new one.' },
-        { status: 400 }
-      );
+    if (new Date() > new Date(tokenRecord.expires_at)) {
+      await supabase.from('password_reset_tokens').delete().eq('token', token);
+      return NextResponse.json({ success: false, message: 'Reset link has expired. Please request a new one.' }, { status: 400 });
     }
 
-    // Hash the new password
     const { hash, salt } = hashPassword(password);
 
-    // Update user password
-    const updateResult = await usersCollection.updateOne(
-      { id: tokenRecord.userId },
-      {
-        $set: {
-          passwordHash: hash,
-          passwordSalt: salt,
-          updatedAt: new Date().toISOString(),
-        },
-      }
-    );
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ password_hash: hash, password_salt: salt, updated_at: new Date().toISOString() })
+      .eq('id', tokenRecord.user_id);
 
-    if (updateResult.matchedCount === 0) {
-      return NextResponse.json(
-        { success: false, message: 'User account not found.' },
-        { status: 404 }
-      );
-    }
+    if (updateError) throw updateError;
 
     // Delete all tokens for this user (one-time use)
-    await tokensCollection.deleteMany({ userId: tokenRecord.userId });
+    await supabase.from('password_reset_tokens').delete().eq('user_id', tokenRecord.user_id);
 
-    return NextResponse.json({
-      success: true,
-      message: 'Password has been reset successfully. You can now log in.',
-    });
+    return NextResponse.json({ success: true, message: 'Password has been reset successfully. You can now log in.' });
   } catch (error) {
-    return NextResponse.json(
-      { success: false, message: 'Something went wrong. Please try again.' },
-      { status: 500 }
-    );
+    console.error('[ResetPassword]', error);
+    return NextResponse.json({ success: false, message: 'Something went wrong. Please try again.' }, { status: 500 });
   }
 }

@@ -1,32 +1,28 @@
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { getDatabase } from '@/lib/db/mongodb';
+import { getSupabase } from '@/lib/db/supabase';
 import { getSessionFromRequest } from '@/lib/auth/session';
 import { JobStatus, mockJobs } from '@/lib/db/schema';
 
-let jobsIndexesInitialized = false;
-
-async function ensureJobsIndexes(jobsCollection) {
-  if (jobsIndexesInitialized) return;
-  await jobsCollection.createIndex({ id: 1 }, { unique: true });
-  await jobsCollection.createIndex({ clientId: 1, createdAt: -1 });
-  jobsIndexesInitialized = true;
-}
-
 export async function GET() {
   try {
-    const db = await getDatabase();
-    const jobsCollection = db.collection('jobs');
-    await ensureJobsIndexes(jobsCollection);
+    const supabase = getSupabase();
+    const { data: jobs, error } = await supabase
+      .from('jobs')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-    const jobs = await jobsCollection.find({}).sort({ createdAt: -1 }).toArray();
-    if (jobs.length === 0) {
+    if (error) throw error;
+
+    if (!jobs || jobs.length === 0) {
       return NextResponse.json({ success: true, jobs: mockJobs });
     }
 
-    const normalizedJobs = jobs.map(({ _id, ...job }) => job);
-    return NextResponse.json({ success: true, jobs: normalizedJobs });
+    // Normalize snake_case → camelCase for frontend compatibility
+    const normalized = jobs.map(normalizeJob);
+    return NextResponse.json({ success: true, jobs: normalized });
   } catch (error) {
+    console.error('[GET /jobs]', error);
     return NextResponse.json({ success: false, message: 'Unable to fetch jobs right now.' }, { status: 500 });
   }
 }
@@ -38,61 +34,84 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
     }
 
-    const db = await getDatabase();
-    const usersCollection = db.collection('users');
-    const user = await usersCollection.findOne({ id: session.userId });
+    const supabase = getSupabase();
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, role')
+      .eq('id', session.userId)
+      .maybeSingle();
 
+    if (userError) throw userError;
     if (!user || user.role !== 'CLIENT') {
       return NextResponse.json({ success: false, message: 'Only clients can create jobs.' }, { status: 403 });
     }
 
-    const body = await request.json();
-    const title = body?.title?.trim();
-    const description = body?.description?.trim();
-    const category = body?.category;
-    const budgetMin = Number(body?.budgetMin || 0);
-    const budgetMax = Number(body?.budgetMax || 0);
+    const body          = await request.json();
+    const title         = body?.title?.trim();
+    const description   = body?.description?.trim();
+    const category      = body?.category;
+    const budgetMin     = Number(body?.budgetMin || 0);
+    const budgetMax     = Number(body?.budgetMax || 0);
     const requiredSkills = Array.isArray(body?.requiredSkills)
-      ? body.requiredSkills.map((skill) => String(skill).trim()).filter(Boolean)
+      ? body.requiredSkills.map((s) => String(s).trim()).filter(Boolean)
       : [];
-    const isUrgent = !!body?.isUrgent;
-    const isFeatured = !!body?.isFeatured;
-    const featuredDays = Number(body?.featuredDays || 0);
+    const isUrgent      = !!body?.isUrgent;
+    const isFeatured    = !!body?.isFeatured;
+    const featuredDays  = Number(body?.featuredDays || 0);
 
     if (!title || !description || !category || budgetMin <= 0 || budgetMax <= 0 || requiredSkills.length === 0) {
       return NextResponse.json({ success: false, message: 'Invalid job payload.' }, { status: 400 });
     }
-
     if (budgetMin > budgetMax) {
       return NextResponse.json({ success: false, message: 'Budget min cannot exceed budget max.' }, { status: 400 });
     }
 
     const now = new Date().toISOString();
     const job = {
-      id: uuidv4(),
-      clientId: user.id,
+      id              : uuidv4(),
+      client_id       : user.id,
       title,
       description,
       category,
-      budgetMin,
-      budgetMax,
-      isUrgent,
-      requiredSkills,
-      isFeatured,
-      featuredUntil: isFeatured && [1, 3].includes(featuredDays)
+      budget_min      : budgetMin,
+      budget_max      : budgetMax,
+      is_urgent       : isUrgent,
+      required_skills : requiredSkills,
+      is_featured     : isFeatured,
+      featured_until  : isFeatured && [1, 3].includes(featuredDays)
         ? new Date(Date.now() + featuredDays * 86400000).toISOString()
         : null,
-      status: JobStatus.OPEN,
-      createdAt: now,
-      updatedAt: now,
+      status          : JobStatus.OPEN,
+      created_at      : now,
+      updated_at      : now,
     };
 
-    const jobsCollection = db.collection('jobs');
-    await ensureJobsIndexes(jobsCollection);
-    await jobsCollection.insertOne(job);
+    const { error: insertError } = await supabase.from('jobs').insert(job);
+    if (insertError) throw insertError;
 
-    return NextResponse.json({ success: true, job });
+    return NextResponse.json({ success: true, job: normalizeJob(job) });
   } catch (error) {
+    console.error('[POST /jobs]', error);
     return NextResponse.json({ success: false, message: 'Unable to create job right now.' }, { status: 500 });
   }
+}
+
+// Map DB snake_case → camelCase used by the frontend
+function normalizeJob(j) {
+  return {
+    id            : j.id,
+    clientId      : j.client_id,
+    title         : j.title,
+    description   : j.description,
+    category      : j.category,
+    budgetMin     : j.budget_min,
+    budgetMax     : j.budget_max,
+    isUrgent      : j.is_urgent,
+    isFeatured    : j.is_featured,
+    featuredUntil : j.featured_until,
+    requiredSkills: j.required_skills || [],
+    status        : j.status,
+    createdAt     : j.created_at,
+    updatedAt     : j.updated_at,
+  };
 }

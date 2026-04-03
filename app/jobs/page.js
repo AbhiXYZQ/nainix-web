@@ -142,7 +142,7 @@ const BudgetFilter = ({ budgetMin, budgetMax, onBudgetChange }) => {
       </div>
 
       {/* Dual Range Slider Track */}
-      <div className="px-1">
+      <div className="px-3">
         <div className="relative h-5 flex items-center">
           {/* Grey track */}
           <div className="absolute w-full h-1.5 bg-primary/20 rounded-full" />

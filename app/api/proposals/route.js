@@ -1,17 +1,20 @@
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { getDatabase } from '@/lib/db/mongodb';
+import { getSupabase } from '@/lib/db/supabase';
 import { getSessionFromRequest } from '@/lib/auth/session';
 import { mockProposals } from '@/lib/db/schema';
 
-let proposalsIndexesInitialized = false;
-
-async function ensureProposalsIndexes(proposalsCollection) {
-  if (proposalsIndexesInitialized) return;
-  await proposalsCollection.createIndex({ id: 1 }, { unique: true });
-  await proposalsCollection.createIndex({ freelancerId: 1, createdAt: -1 });
-  await proposalsCollection.createIndex({ jobId: 1, createdAt: -1 });
-  proposalsIndexesInitialized = true;
+function normalizeProposal(p) {
+  return {
+    id              : p.id,
+    jobId           : p.job_id,
+    freelancerId    : p.freelancer_id,
+    pitch           : p.pitch,
+    estimatedDays   : p.estimated_days,
+    price           : p.price,
+    smartMatchScore : p.smart_match_score,
+    createdAt       : p.created_at,
+  };
 }
 
 export async function GET(request) {
@@ -21,36 +24,47 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
     }
 
-    const db = await getDatabase();
-    const proposalsCollection = db.collection('proposals');
-    const jobsCollection = db.collection('jobs');
-    const usersCollection = db.collection('users');
+    const supabase = getSupabase();
+    const { data: user } = await supabase.from('users').select('id, role').eq('id', session.userId).maybeSingle();
+    if (!user) return NextResponse.json({ success: false, message: 'User not found.' }, { status: 404 });
 
-    await ensureProposalsIndexes(proposalsCollection);
+    let proposals = [];
 
-    const user = await usersCollection.findOne({ id: session.userId });
-    if (!user) {
-      return NextResponse.json({ success: false, message: 'User not found.' }, { status: 404 });
-    }
-
-    let query = {};
     if (user.role === 'FREELANCER') {
-      query = { freelancerId: user.id };
+      const { data, error } = await supabase
+        .from('proposals')
+        .select('*')
+        .eq('freelancer_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      proposals = data || [];
+
+      if (proposals.length === 0) {
+        const fallback = mockProposals.filter((p) => p.freelancerId === user.id);
+        return NextResponse.json({ success: true, proposals: fallback });
+      }
     } else if (user.role === 'CLIENT') {
-      const myJobs = await jobsCollection.find({ clientId: user.id }).project({ id: 1 }).toArray();
-      const myJobIds = myJobs.map((job) => job.id);
-      query = { jobId: { $in: myJobIds } };
+      const { data: myJobs } = await supabase.from('jobs').select('id').eq('client_id', user.id);
+      const myJobIds = (myJobs || []).map((j) => j.id);
+
+      if (myJobIds.length === 0) {
+        return NextResponse.json({ success: true, proposals: [] });
+      }
+
+      const { data, error } = await supabase
+        .from('proposals')
+        .select('*')
+        .in('job_id', myJobIds)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      proposals = data || [];
     }
 
-    const proposals = await proposalsCollection.find(query).sort({ createdAt: -1 }).toArray();
-    if (proposals.length === 0 && user.role === 'FREELANCER') {
-      const fallback = mockProposals.filter((proposal) => proposal.freelancerId === user.id);
-      return NextResponse.json({ success: true, proposals: fallback });
-    }
-
-    const normalizedProposals = proposals.map(({ _id, ...proposal }) => proposal);
-    return NextResponse.json({ success: true, proposals: normalizedProposals });
+    return NextResponse.json({ success: true, proposals: proposals.map(normalizeProposal) });
   } catch (error) {
+    console.error('[GET /proposals]', error);
     return NextResponse.json({ success: false, message: 'Unable to fetch proposals right now.' }, { status: 500 });
   }
 }
@@ -62,48 +76,42 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
     }
 
-    const db = await getDatabase();
-    const usersCollection = db.collection('users');
-    const jobsCollection = db.collection('jobs');
-    const proposalsCollection = db.collection('proposals');
-
-    const user = await usersCollection.findOne({ id: session.userId });
+    const supabase = getSupabase();
+    const { data: user } = await supabase.from('users').select('id, role').eq('id', session.userId).maybeSingle();
     if (!user || user.role !== 'FREELANCER') {
       return NextResponse.json({ success: false, message: 'Only freelancers can submit proposals.' }, { status: 403 });
     }
 
-    const body = await request.json();
-    const jobId = body?.jobId;
-    const pitch = body?.pitch?.trim();
+    const body          = await request.json();
+    const jobId         = body?.jobId;
+    const pitch         = body?.pitch?.trim();
     const estimatedDays = Number(body?.estimatedDays || 0);
-    const price = Number(body?.price || 0);
+    const price         = Number(body?.price || 0);
 
     if (!jobId || !pitch || estimatedDays <= 0 || price <= 0) {
       return NextResponse.json({ success: false, message: 'Invalid proposal payload.' }, { status: 400 });
     }
 
-    const job = await jobsCollection.findOne({ id: jobId });
-    if (!job) {
-      return NextResponse.json({ success: false, message: 'Job not found.' }, { status: 404 });
-    }
-
-    await ensureProposalsIndexes(proposalsCollection);
+    const { data: job } = await supabase.from('jobs').select('id').eq('id', jobId).maybeSingle();
+    if (!job) return NextResponse.json({ success: false, message: 'Job not found.' }, { status: 404 });
 
     const proposal = {
-      id: uuidv4(),
-      jobId,
-      freelancerId: user.id,
-      pitch: pitch.slice(0, 300),
-      estimatedDays,
+      id              : uuidv4(),
+      job_id          : jobId,
+      freelancer_id   : user.id,
+      pitch           : pitch.slice(0, 300),
+      estimated_days  : estimatedDays,
       price,
-      smartMatchScore: Math.floor(Math.random() * 20) + 80,
-      createdAt: new Date().toISOString(),
+      smart_match_score: Math.floor(Math.random() * 20) + 80,
+      created_at      : new Date().toISOString(),
     };
 
-    await proposalsCollection.insertOne(proposal);
+    const { error } = await supabase.from('proposals').insert(proposal);
+    if (error) throw error;
 
-    return NextResponse.json({ success: true, proposal });
+    return NextResponse.json({ success: true, proposal: normalizeProposal(proposal) });
   } catch (error) {
+    console.error('[POST /proposals]', error);
     return NextResponse.json({ success: false, message: 'Unable to submit proposal right now.' }, { status: 500 });
   }
 }
