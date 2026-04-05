@@ -19,7 +19,7 @@ export async function GET(request) {
     const baseUrl = process.env.NODE_ENV === 'production' 
       ? (process.env.NEXT_PUBLIC_BASE_URL || requestUrl.origin)
       : requestUrl.origin;
-    const redirectTo = `${baseUrl}/api/auth/callback`;
+    const redirectTo = `${baseUrl}/auth/callback`;
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,

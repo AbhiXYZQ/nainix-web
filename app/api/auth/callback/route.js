@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/db/supabase';
 import { createSessionPayload, setSessionCookie } from '@/lib/auth/session';
-import { cookies } from 'next/headers';
 
 function toSafeUser(user) {
   return {
@@ -31,36 +30,29 @@ function toSafeUser(user) {
   };
 }
 
-export async function GET(request) {
+export async function POST(request) {
   try {
-    const requestUrl = new URL(request.url);
-    const code = requestUrl.searchParams.get('code');
-    const next = requestUrl.searchParams.get('next') || '/';
-    
-    // We construct the base URL safely
-    const baseUrl = process.env.NODE_ENV === 'production' 
-      ? (process.env.NEXT_PUBLIC_BASE_URL || requestUrl.origin)
-      : requestUrl.origin;
+    const { access_token } = await request.json();
 
-    if (!code) {
-      return NextResponse.redirect(`${baseUrl}/login?error=MissingAuthCode`);
+    if (!access_token) {
+      return NextResponse.json({ success: false, message: 'Missing access token' }, { status: 400 });
     }
 
     const supabase = getSupabase();
     
-    // Exchange the code for a session
-    const { data: authData, error: authError } = await supabase.auth.exchangeCodeForSession(code);
+    // Verify user securely on server using the token
+    const { data: userData, error: userError } = await supabase.auth.getUser(access_token);
 
-    if (authError || !authData.session) {
-      console.error('[OAuth Callback] Session exchange failed:', authError);
-      return NextResponse.redirect(`${baseUrl}/login?error=OAuthFailed`);
+    if (userError || !userData?.user) {
+      console.error('[OAuth Backend Verify] Error:', userError);
+      return NextResponse.json({ success: false, message: 'Invalid or expired token' }, { status: 401 });
     }
 
-    const authUser = authData.session.user;
+    const authUser = userData.user;
     const email = authUser.email;
 
     if (!email) {
-      return NextResponse.redirect(`${baseUrl}/login?error=EmailNotProvidedByOAuth`);
+      return NextResponse.json({ success: false, message: 'Email not provided by OAuth provider' }, { status: 400 });
     }
 
     // Check if this user exists in our local custom 'users' table
@@ -71,39 +63,35 @@ export async function GET(request) {
       .maybeSingle();
 
     if (dbError) {
-      console.error('[OAuth Callback] DB lookup failed:', dbError);
-      return NextResponse.redirect(`${baseUrl}/login?error=InternalDatabaseError`);
+      console.error('[OAuth DB Check] Error:', dbError);
+      return NextResponse.json({ success: false, message: 'Database lookup failed' }, { status: 500 });
     }
 
     if (existingUser) {
-      // User already exists, log them in normally via our custom JWT session
       const safeUser = toSafeUser(existingUser);
-      // We will redirect directly. To set a cookie during redirect using next/server:
-      const response = NextResponse.redirect(
-        `${baseUrl}${existingUser.role === 'CLIENT' ? '/dashboard/client' : '/dashboard/freelancer'}`
-      );
+      const response = NextResponse.json({ 
+        success: true, 
+        user: safeUser,
+        redirect: existingUser.role === 'CLIENT' ? '/dashboard/client' : '/dashboard/freelancer'
+      });
       setSessionCookie(response, createSessionPayload({ userId: safeUser.id, role: safeUser.role, email: safeUser.email }));
-      
       return response;
     } else {
       // User does NOT exist in custom 'users' table. Need to register.
-      // We store the OAuth metadata to bypass the password in `/register`
       const metadata = authUser.user_metadata || {};
       const oauthPendingPayload = JSON.stringify({
         email: email,
         name: metadata.full_name || metadata.name || '',
         avatar_url: metadata.avatar_url || metadata.picture || '',
-        providerId: authUser.id, // The raw Supabase auth ID
+        providerId: authUser.id, 
         verified: true,
       });
       
-      const redirectUrl = new URL(`${baseUrl}/register`);
-      redirectUrl.searchParams.set('oauth', 'true');
-      if (metadata.full_name || metadata.name) redirectUrl.searchParams.set('name', metadata.full_name || metadata.name);
-      if (email) redirectUrl.searchParams.set('email', email);
+      const response = NextResponse.json({ 
+        success: true, 
+        redirect: `/register?oauth=true&name=${encodeURIComponent(metadata.full_name || metadata.name || '')}&email=${encodeURIComponent(email)}`
+      });
 
-      const response = NextResponse.redirect(redirectUrl.toString());
-      // Short-lived cookie to verify they came from OAuth (1 hour)
       const base64Payload = Buffer.from(oauthPendingPayload).toString('base64');
       response.cookies.set('oauth_pending', base64Payload, {
         httpOnly: true,
@@ -114,10 +102,8 @@ export async function GET(request) {
 
       return response;
     }
-
   } catch (error) {
-    console.error('[OAuth Callback Route]', error);
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    return NextResponse.redirect(`${baseUrl}/login?error=InternalServerError`);
+    console.error('[OAuth POST Callback Error]', error);
+    return NextResponse.json({ success: false, message: 'Internal Server Error' }, { status: 500 });
   }
 }
