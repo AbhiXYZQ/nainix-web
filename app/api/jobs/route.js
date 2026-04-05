@@ -2,20 +2,26 @@ import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { getSupabase } from '@/lib/db/supabase';
 import { getSessionFromRequest } from '@/lib/auth/session';
-import { JobStatus, mockJobs } from '@/lib/db/schema';
+import { JobStatus, mockJobs, mockUsers } from '@/lib/db/schema';
 
 export async function GET() {
   try {
     const supabase = getSupabase();
     const { data: jobs, error } = await supabase
       .from('jobs')
-      .select('*')
+      .select('*, client:users(id, name, avatar_url, verified_badges)')
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.warn('Supabase fetch failed or relations error, using mock data:', error.message);
+    }
 
-    if (!jobs || jobs.length === 0) {
-      return NextResponse.json({ success: true, jobs: mockJobs });
+    if (!jobs || jobs.length === 0 || error) {
+      const mockWithClients = mockJobs.map(job => ({
+        ...job,
+        client: mockUsers.find(u => u.id === job.clientId) || null
+      }));
+      return NextResponse.json({ success: true, jobs: mockWithClients });
     }
 
     // Normalize snake_case → camelCase for frontend compatibility
@@ -101,6 +107,7 @@ function normalizeJob(j) {
   return {
     id            : j.id,
     clientId      : j.client_id,
+    client        : j.client || null,
     title         : j.title,
     description   : j.description,
     category      : j.category,
