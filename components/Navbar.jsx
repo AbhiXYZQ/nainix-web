@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Search, Moon, Sun, Menu, X, UserCog } from 'lucide-react';
+import { Search, Moon, Sun, Menu, X, UserCog, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -99,6 +99,10 @@ const Navbar = () => {
         <div className="hidden md:flex items-center space-x-6">
           <Link href="/jobs" className="text-sm font-medium hover:text-primary transition-colors">
             Find Work
+          </Link>
+          <Link href="/founders" className="group relative inline-flex items-center justify-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary hover:bg-primary/20 transition-all border border-primary/20">
+            <Zap className="h-3.5 w-3.5 fill-current group-hover:animate-pulse" />
+            Founders Offer
           </Link>
           <Link href="/#how-it-works" className="text-sm font-medium hover:text-primary transition-colors">
             How it Works
@@ -207,6 +211,10 @@ const Navbar = () => {
           </Button>
           <Link href="/jobs" className="block px-4 py-2 hover:bg-muted rounded-md" onClick={() => setMobileMenuOpen(false)}>
             Find Work
+          </Link>
+          <Link href="/founders" className="block px-4 py-2 font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-md flex items-center gap-2 border border-primary/20 transition-all" onClick={() => setMobileMenuOpen(false)}>
+            <Zap className="h-4 w-4 fill-current animate-pulse" />
+            Founders Offer
           </Link>
           <Link href="/#how-it-works" className="block px-4 py-2 hover:bg-muted rounded-md" onClick={() => setMobileMenuOpen(false)}>
             How it Works

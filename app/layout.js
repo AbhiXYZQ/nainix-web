@@ -3,6 +3,7 @@ import { ThemeProvider } from 'next-themes';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Toaster } from '@/components/ui/sonner';
+import PremiumChatbot from '@/components/PremiumChatbot';
 
 export const metadata = {
   title: 'Nainix - 0% Commission Freelancing Platform',
@@ -26,6 +27,7 @@ export default function RootLayout({ children }) {
               {children}
             </main>
             <Footer />
+            <PremiumChatbot />
           </div>
           <Toaster />
         </ThemeProvider>

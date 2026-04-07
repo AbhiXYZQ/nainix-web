@@ -109,6 +109,19 @@ const RegisterPage = () => {
   const [liveChecks, setLiveChecks] = useState(initialLiveChecks);
   const [loading, setLoading] = useState(false);
   const [isOAuth, setIsOAuth] = useState(false);
+  const [freelancerCount, setFreelancerCount] = useState(0);
+
+  useEffect(() => {
+    fetch('/api/stats/freelancers')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) setFreelancerCount(data.count || 0);
+      })
+      .catch(err => console.error(err));
+  }, []);
+
+  const spotsLeft100 = Math.max(0, 100 - freelancerCount);
+  const spotsLeft500 = Math.max(0, 500 - freelancerCount);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -530,10 +543,37 @@ const RegisterPage = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <Tabs value={role} onValueChange={setRole} className="mb-6">
+            {/* Promo Banner */}
+            <div className="mb-6 rounded-xl border-2 border-primary/20 bg-primary/5 p-4 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-2 opacity-10">
+                <Sparkles className="h-20 w-20 text-primary" />
+              </div>
+              <h4 className="font-bold text-primary flex items-center gap-2 mb-2">
+                <CheckCircle2 className="h-5 w-5" /> Founding Member Registration
+              </h4>
+              <p className="text-sm text-foreground/80 mb-3">
+                You are exactly in time. Complete your profile today to claim your early access benefits.
+              </p>
+              <div className="flex gap-4 text-sm font-semibold">
+                <div className="bg-background/80 px-3 py-1.5 rounded-md border text-primary">
+                  {spotsLeft100} Lifetime Free spots left
+                </div>
+                <div className="bg-background/80 px-3 py-1.5 rounded-md border text-accent">
+                  {spotsLeft500} Badges left
+                </div>
+              </div>
+            </div>
+
+            <Tabs value={role} onValueChange={(val) => {
+              if (val === 'CLIENT') {
+                toast.info('Client registration is currently Invite-Only while we build our developer base. Join the Waitlist soon!');
+                return;
+              }
+              setRole(val);
+            }} className="mb-6">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="FREELANCER">I'm a Freelancer</TabsTrigger>
-                <TabsTrigger value="CLIENT">I'm a Client</TabsTrigger>
+                <TabsTrigger value="CLIENT" className="opacity-50 cursor-not-allowed">I'm a Client (Waitlist)</TabsTrigger>
               </TabsList>
             </Tabs>
 

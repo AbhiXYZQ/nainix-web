@@ -10,6 +10,16 @@ import { mockSuccessStories } from '@/lib/db/schema';
 const LandingPage = () => {
   return (
     <div className="w-full">
+      {/* 🚀 NEW FOUNDERS TOP BANNER */}
+      <div className="w-full bg-gradient-to-r from-primary via-accent to-primary p-0.5 text-center group cursor-pointer relative overflow-hidden transition-all hover:brightness-110">
+        <Link href="/founders" className="flex items-center justify-center gap-2 text-sm font-medium text-white px-4 py-2 relative z-10 w-full h-full">
+           <Zap className="h-4 w-4 animate-pulse" />
+           <span><strong className="underline underline-offset-2 decoration-white/60">Launch Offer:</strong> Lifetime 0% Commission & Founding Member Batch for Early Freelancers. </span>
+           <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs hidden sm:inline-block border border-white/20">Learn More</span>
+           <ArrowRight className="h-3 w-3 group-hover:translate-x-1 transition-transform" />
+        </Link>
+      </div>
+
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-accent/20" />
