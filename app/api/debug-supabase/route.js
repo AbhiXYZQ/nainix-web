@@ -1,8 +1,21 @@
 import { NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/db/supabase';
+import { getSessionFromRequest } from '@/lib/auth/session';
 
-export async function GET() {
+const ADMIN_EMAIL = 'hello@nainix.me';
+
+export async function GET(request) {
   try {
+    const session = getSessionFromRequest(request);
+    
+    // Security Check: Only the site owner/admin can run debug tests
+    if (!session || session.email !== ADMIN_EMAIL) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Unauthorized: Administrative access required.' 
+      }, { status: 403 });
+    }
+
     const supabase = getSupabase();
     
     // Test 1: Basic connection

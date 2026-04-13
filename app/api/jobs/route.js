@@ -4,6 +4,16 @@ import { getSupabase } from '@/lib/db/supabase';
 import { getSessionFromRequest } from '@/lib/auth/session';
 import { JobStatus, mockJobs, mockUsers } from '@/lib/db/schema';
 
+function getSafeClient(user) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    name: user.name,
+    avatar_url: user.avatar_url || user.avatarUrl,
+    verified_badges: user.verified_badges || user.verifiedBadges || []
+  };
+}
+
 export async function GET() {
   try {
     const supabase = getSupabase();
@@ -19,13 +29,16 @@ export async function GET() {
     if (!jobs || jobs.length === 0 || error) {
       const mockWithClients = mockJobs.map(job => ({
         ...job,
-        client: mockUsers.find(u => u.id === job.clientId) || null
+        client: getSafeClient(mockUsers.find(u => u.id === job.clientId))
       }));
       return NextResponse.json({ success: true, jobs: mockWithClients });
     }
 
     // Normalize snake_case → camelCase for frontend compatibility
-    const normalized = jobs.map(normalizeJob);
+    const normalized = jobs.map(j => ({
+      ...normalizeJob(j),
+      client: getSafeClient(j.client)
+    }));
     return NextResponse.json({ success: true, jobs: normalized });
   } catch (error) {
     console.error('[GET /jobs]', error);

@@ -2,14 +2,14 @@ import { NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/db/supabase';
 import { mockUsers } from '@/lib/db/schema';
 
-function toSafeUser(user) {
-  return {
+import { getSessionFromRequest } from '@/lib/auth/session';
+
+function toSafeUser(user, isOwner = false) {
+  const safe = {
     id: user.id,
     role: user.role,
     name: user.name,
-    email: user.email,
     username: user.username,
-    phone: user.phone,
     bio: user.bio,
     country: user.country,
     state: user.state,
@@ -28,6 +28,13 @@ function toSafeUser(user) {
     createdAt: user.created_at || user.createdAt,
     updatedAt: user.updated_at || user.updatedAt,
   };
+
+  if (isOwner) {
+    safe.email = user.email;
+    safe.phone = user.phone;
+  }
+
+  return safe;
 }
 
 export async function GET(request, { params }) {
@@ -37,6 +44,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ success: false, message: 'Username is required.' }, { status: 400 });
     }
 
+    const session = getSessionFromRequest(request);
     const supabase = getSupabase();
     const { data: user, error } = await supabase
       .from('users')
@@ -47,13 +55,15 @@ export async function GET(request, { params }) {
     if (error) throw error;
 
     if (user) {
-      return NextResponse.json({ success: true, user: toSafeUser(user) });
+      const isOwner = session?.userId === user.id;
+      return NextResponse.json({ success: true, user: toSafeUser(user, isOwner) });
     }
 
     // Fallback to mock data
     const mockUser = mockUsers.find((u) => u.username === username);
     if (mockUser) {
-      return NextResponse.json({ success: true, user: mockUser });
+      const isOwner = session?.userId === mockUser.id;
+      return NextResponse.json({ success: true, user: toSafeUser(mockUser, isOwner) });
     }
 
     return NextResponse.json({ success: false, message: 'User not found.' }, { status: 404 });

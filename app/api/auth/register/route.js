@@ -76,6 +76,14 @@ export async function POST(request) {
     }
 
     const body        = await request.json();
+    const website     = body?.website; // Honeypot field
+
+    // Bot detection
+    if (website) {
+       console.warn('[Register] Bot attempt blocked via honeypot.');
+       return NextResponse.json({ success: false, message: 'Invalid request.' }, { status: 400 });
+    }
+
     const name        = body?.name?.trim();
     const email       = normalizeEmail(body?.email);
     const username    = normalizeUsername(body?.username);
@@ -96,7 +104,7 @@ export async function POST(request) {
     }
     if (!isValidEmail(email))     return NextResponse.json({ success: false, message: 'Please enter a valid email address.' }, { status: 400 });
     if (!isValidPhone(phone))     return NextResponse.json({ success: false, message: 'Please enter a valid phone number in international format.' }, { status: 400 });
-    if (!isOAuth && password.length < 6)      return NextResponse.json({ success: false, message: 'Password must be at least 6 characters.' }, { status: 400 });
+    if (!isOAuth && password.length < 8)      return NextResponse.json({ success: false, message: 'Password must be at least 8 characters.' }, { status: 400 });
     if (!['CLIENT', 'FREELANCER'].includes(role)) return NextResponse.json({ success: false, message: 'Invalid role selected.' }, { status: 400 });
     if (bio.length < 30)          return NextResponse.json({ success: false, message: 'Bio must be at least 30 characters.' }, { status: 400 });
     if (!acceptTerms)             return NextResponse.json({ success: false, message: 'You must accept terms and privacy policy.' }, { status: 400 });

@@ -104,6 +104,7 @@ const RegisterPage = () => {
     hiringGoal: '',
     budgetRange: '',
     acceptTerms: false,
+    website: '', // Honeypot field for bot protection
   });
 
   const [liveChecks, setLiveChecks] = useState(initialLiveChecks);
@@ -354,8 +355,8 @@ const RegisterPage = () => {
       return;
     }
 
-    if (!isOAuth && trimmedData.password.length < 6) {
-      toast.error('Password must be at least 6 characters.');
+    if (!isOAuth && trimmedData.password.length < 8) {
+      toast.error('Password must be at least 8 characters.');
       setLoading(false);
       return;
     }
@@ -450,8 +451,8 @@ const RegisterPage = () => {
         if (showToast) toast.error('Step 1: Fill name, username, email' + (isOAuth ? '.' : ' and password.'));
         return false;
       }
-      if (!isOAuth && formData.password.length < 6) {
-        if (showToast) toast.error('Step 1: Password must be at least 6 characters.');
+      if (!isOAuth && formData.password.length < 8) {
+        if (showToast) toast.error('Step 1: Password must be at least 8 characters.');
         return false;
       }
       if (fieldHasBlockingIssue('username') || fieldHasBlockingIssue('email')) {
@@ -583,6 +584,12 @@ const RegisterPage = () => {
                   <div className="flex items-center gap-2 text-sm text-primary">
                     <Sparkles className="h-4 w-4" />
                     <span>Fast start: basic account setup (under 1 min)</span>
+                  </div>
+
+                  {/* Honeypot field (hidden from humans) */}
+                  <div className="hidden" aria-hidden="true">
+                    <Label htmlFor="website">Website</Label>
+                    <Input id="website" name="website" tabIndex="-1" autoComplete="off" value={formData.website} onChange={handleChange} />
                   </div>
 
                   {!isOAuth && (
