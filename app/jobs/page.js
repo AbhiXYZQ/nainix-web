@@ -257,7 +257,15 @@ const FilterSidebar = ({ filters, setFilters }) => {
 const JobsPage = () => {
   const [selectedJob, setSelectedJob] = useState(null);
   const [proposalModalOpen, setProposalModalOpen] = useState(false);
-  const { filters, setFilters, getFilteredJobs, cleanupExpiredFeaturedJobs, fetchJobs } = useJobStore();
+  const { 
+    jobs, // Extract jobs directly from store
+    filters, 
+    setFilters, 
+    getFilteredJobs, 
+    cleanupExpiredFeaturedJobs, 
+    fetchJobs 
+  } = useJobStore();
+
   const { isAuthenticated, user } = useAuthStore();
   const router = useRouter();
   const [filteredJobs, setFilteredJobs] = useState([]);
@@ -271,12 +279,23 @@ const JobsPage = () => {
 
   useEffect(() => {
     fetchJobs();
-  }, [fetchJobs]);
+    cleanupExpiredFeaturedJobs(); // Run cleanup once on mount
+  }, [fetchJobs, cleanupExpiredFeaturedJobs]);
+
+  // Reset filters to default on every page load
+  useEffect(() => {
+    setFilters({
+      category: null,
+      budgetMin: BUDGET_MIN_LIMIT,
+      budgetMax: null,
+      skills: [],
+      urgentOnly: false,
+    });
+  }, [setFilters]); // Safe because setFilters is stable
 
   useEffect(() => {
-    cleanupExpiredFeaturedJobs();
     setFilteredJobs(getFilteredJobs());
-  }, [filters, getFilteredJobs, cleanupExpiredFeaturedJobs]);
+  }, [jobs, filters, getFilteredJobs]); // Removed cleanupExpiredFeaturedJobs from here
 
   useEffect(() => {
     trackEvent('jobs_page_viewed', {

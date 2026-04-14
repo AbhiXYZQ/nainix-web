@@ -23,15 +23,12 @@ export async function GET() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.warn('Supabase fetch failed or relations error, using mock data:', error.message);
+      console.warn('Supabase fetch failed:', error.message);
+      return NextResponse.json({ success: true, jobs: [] });
     }
 
-    if (!jobs || jobs.length === 0 || error) {
-      const mockWithClients = mockJobs.map(job => ({
-        ...job,
-        client: getSafeClient(mockUsers.find(u => u.id === job.clientId))
-      }));
-      return NextResponse.json({ success: true, jobs: mockWithClients });
+    if (!jobs || jobs.length === 0) {
+      return NextResponse.json({ success: true, jobs: [] });
     }
 
     // Normalize snake_case → camelCase for frontend compatibility

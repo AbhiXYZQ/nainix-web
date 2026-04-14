@@ -39,11 +39,6 @@ export async function GET(request) {
 
       if (error) throw error;
       proposals = data || [];
-
-      if (proposals.length === 0) {
-        const fallback = mockProposals.filter((p) => p.freelancerId === user.id);
-        return NextResponse.json({ success: true, proposals: fallback });
-      }
     } else if (user.role === 'CLIENT') {
       const { data: myJobs } = await supabase.from('jobs').select('id').eq('client_id', user.id);
       const myJobIds = (myJobs || []).map((j) => j.id);
