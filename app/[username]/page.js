@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
   Mail, Github, Linkedin, MessageCircle, Shield, Play, Sparkles, ArrowLeft,
@@ -117,20 +118,6 @@ const ProfilePage = () => {
   }
   if (!user) return <NotFoundState username={params.username} onRetry={() => setRetryCount(c => c + 1)} />;
 
-  if (user.role === 'CLIENT') {
-    return (
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="container py-24 flex flex-col items-center text-center gap-6">
-        <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center">
-          <Shield className="h-10 w-10 text-muted-foreground" />
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold">Client Profile</h1>
-          <p className="text-muted-foreground max-w-sm">This is a private client account. Client profiles are not publicly visible on Nainix.</p>
-        </div>
-        <Button variant="outline" onClick={() => router.back()}><ArrowLeft className="mr-2 h-4 w-4" /> Go Back</Button>
-      </motion.div>
-    );
-  }
 
   const profile = user.roleProfile || {};
   const location = [user.city, user.country].filter(Boolean).join(', ');
@@ -167,9 +154,15 @@ const ProfilePage = () => {
                     )}
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground font-medium flex-wrap">
-                    <span className="text-primary">{profile.professionalTitle || 'Nainix Professional'}</span>
+                    <span className="text-primary">{profile.professionalTitle || (user.role === 'CLIENT' ? 'Verified Client' : 'Nainix Professional')}</span>
                     <span>•</span>
                     <span>@{user.username}</span>
+                    {user.role === 'CLIENT' && (
+                      <>
+                        <span>•</span>
+                        <Badge variant="outline" className="border-primary/30 text-primary bg-primary/5">Hire Manager</Badge>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -178,22 +171,32 @@ const ProfilePage = () => {
                   {location && (
                     <div className="flex items-center gap-1.5"><MapPin className="h-4 w-4" /> <span className="text-foreground font-medium">{location}</span></div>
                   )}
-                  {profile.hourlyRate > 0 && (
+                  {user.role === 'FREELANCER' && profile.hourlyRate > 0 && (
                      <div className="flex items-center gap-1.5 flex-none"><IndianRupee className="h-4 w-4" /> <span className="text-foreground font-medium">{formatCurrency(profile.hourlyRate)}/hr</span></div>
                   )}
-                  {profile.experienceYears > 0 && (
+                  {user.role === 'FREELANCER' && profile.experienceYears > 0 && (
                      <div className="flex items-center gap-1.5"><Award className="h-4 w-4" /> <span className="text-foreground font-medium">{profile.experienceYears} Yrs Exp.</span></div>
                   )}
-                  {profile.availability && (
+                  {user.role === 'FREELANCER' && profile.availability && (
                      <div className="flex items-center gap-1.5"><Clock className="h-4 w-4" /> <span className="text-foreground font-medium capitalize">{profile.availability.replace('_', ' ')}</span></div>
                   )}
+                  {user.role === 'CLIENT' && (
+                    <div className="flex items-center gap-1.5"><Calendar className="h-4 w-4" /> <span className="text-foreground font-medium">Member since {new Date(user.createdAt).getFullYear()}</span></div>
+                  )}
+                  <div className="flex items-center gap-1.5"><Shield className="h-4 w-4 text-primary" /> <span className="text-foreground font-medium">Identity Verified</span></div>
                 </div>
 
                 <p className="text-base text-foreground leading-relaxed whitespace-pre-wrap">{user.bio}</p>
 
                 {/* Quick Actions */}
                 <div className="flex flex-wrap gap-3 pt-2">
-                  <Button className="w-full sm:w-auto">Invite to Job</Button>
+                  {user.role === 'FREELANCER' ? (
+                    <Button className="w-full sm:w-auto">Invite to Job</Button>
+                  ) : (
+                    <Button className="w-full sm:w-auto" asChild>
+                      <Link href="/dashboard">View Open Jobs</Link>
+                    </Button>
+                  )}
                   
                   {user.socialLinks?.github && (
                     <Button variant="outline" size="icon" asChild><a href={user.socialLinks.github} target="_blank" rel="noreferrer" title="GitHub"><Github className="h-4 w-4" /></a></Button>
