@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/db/supabase';
 import { getSessionFromRequest } from '@/lib/auth/session';
 
+export const dynamic = 'force-dynamic';
+
 function toSafeUser(user) {
   return {
     id: user.id,

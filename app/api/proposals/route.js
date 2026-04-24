@@ -4,6 +4,8 @@ import { getSupabase } from '@/lib/db/supabase';
 import { getSessionFromRequest } from '@/lib/auth/session';
 import { mockProposals } from '@/lib/db/schema';
 
+export const dynamic = 'force-dynamic';
+
 function normalizeProposal(p) {
   return {
     id              : p.id,

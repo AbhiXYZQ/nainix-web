@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/db/supabase';
 import { getSessionFromRequest } from '@/lib/auth/session';
 
+export const dynamic = 'force-dynamic';
+
 const ADMIN_EMAIL = 'hello@nainix.me';
 
 export async function GET(request) {

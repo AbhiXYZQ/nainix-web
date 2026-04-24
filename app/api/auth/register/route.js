@@ -218,6 +218,9 @@ export async function POST(request) {
       }
     } catch (verifErr) {
       console.error('[Register] Verification trigger failed:', verifErr.message);
+      if (verifErr.message.includes('Resend')) {
+        console.warn('CRITICAL: Resend configuration issue. OTP was not sent. User will be stuck unless they verify their domain in Resend.');
+      }
       // We continue because the user can manually request a resend if it failed here
     }
 

@@ -17,9 +17,10 @@ function getSafeClient(user) {
 export async function GET() {
   try {
     const supabase = getSupabase();
+    // Fetch jobs with client info and the count of proposals
     const { data: jobs, error } = await supabase
       .from('jobs')
-      .select('*, client:users(id, name, avatar_url, verified_badges)')
+      .select('*, client:users(id, name, avatar_url, verified_badges), proposals:proposals(count)')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -34,7 +35,8 @@ export async function GET() {
     // Normalize snake_case → camelCase for frontend compatibility
     const normalized = jobs.map(j => ({
       ...normalizeJob(j),
-      client: getSafeClient(j.client)
+      client: getSafeClient(j.client),
+      proposalCount: j.proposals?.[0]?.count || 0
     }));
     return NextResponse.json({ success: true, jobs: normalized });
   } catch (error) {

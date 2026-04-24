@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDistanceToNow, isValid } from 'date-fns';
 import { motion } from 'framer-motion';
 import { Clock, IndianRupee, Sparkles, Zap, Building2, Users, ArrowRight, Briefcase } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -10,24 +11,18 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Link from 'next/link';
 
 const formatTimeAgo = (dateString) => {
+  if (!dateString) return 'Pending';
   const date = new Date(dateString);
-  const now = new Date();
-  const diffInSeconds = Math.floor((now - date) / 1000);
+  if (!isValid(date)) return 'Recently';
   
-  if (diffInSeconds < 60) return 'Just now';
-  const diffInMinutes = Math.floor(diffInSeconds / 60);
-  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-  const diffInHours = Math.floor(diffInMinutes / 60);
-  if (diffInHours < 24) return `${diffInHours}h ago`;
-  const diffInDays = Math.floor(diffInHours / 24);
-  return `${diffInDays}d ago`;
+  return formatDistanceToNow(date, { addSuffix: true }).replace('about ', '');
 };
 
 const JobCard = ({ job, onApply }) => {
   const featuredActive = job.isFeatured && (!job.featuredUntil || new Date(job.featuredUntil) > new Date());
   
-  // Deterministic fake proposal count based on job id to avoid hydration mismatch
-  const proposalCount = job.id ? (job.id.charCodeAt(0) + job.id.charCodeAt(job.id.length - 1)) % 25 : 5;
+  // Use real proposal count from the job object (populated by API)
+  const proposalCount = job.proposalCount || 0;
 
   return (
     <motion.div

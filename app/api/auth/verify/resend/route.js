@@ -37,6 +37,12 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error('[POST /api/auth/verify/resend]', error);
-    return NextResponse.json({ success: false, message: 'Failed to resend code. Please try again.' }, { status: 500 });
+    
+    // Return the specific error message if it's a helpful domain/resend error
+    const message = error.message?.includes('Resend') 
+      ? error.message 
+      : 'Failed to resend code. Please try again.';
+
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
