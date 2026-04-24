@@ -29,6 +29,15 @@ const VerifyContent = () => {
     }
   }, [isAuthenticated, user, router]);
 
+  // 🔥 Trigger OTP send on mount if not verified
+  const hasSentInitial = useRef(false);
+  useEffect(() => {
+    if (isAuthenticated && !user?.contactVerification?.emailVerified && !hasSentInitial.current) {
+      hasSentInitial.current = true;
+      handleResend();
+    }
+  }, [isAuthenticated, user]);
+
   // Resend timer logic
   useEffect(() => {
     let interval;
