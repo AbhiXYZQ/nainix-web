@@ -50,8 +50,6 @@ export function middleware(request) {
     const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
     if (sessionCookie) {
       try {
-        // Basic extraction (Note: This doesn't verify signature, just reads payload for UI/UX redirection)
-        // Authentic verification happens in API routes/Server components.
         const [encodedPayload] = sessionCookie.split('.');
         const payload = JSON.parse(atob(encodedPayload.replace(/-/g, '+').replace(/_/g, '/')));
         
@@ -61,6 +59,25 @@ export function middleware(request) {
       } catch (e) {
         // Ignore parsing errors, let original flow handle it
       }
+    }
+  }
+
+  // --- Admin Guard Phase ---
+  // Protect /admin/* routes: only ADMIN role can access
+  if (url.startsWith('/admin')) {
+    const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+    if (!sessionCookie) {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+    try {
+      const [encodedPayload] = sessionCookie.split('.');
+      const payload = JSON.parse(atob(encodedPayload.replace(/-/g, '+').replace(/_/g, '/')));
+      if (!payload || payload.role !== 'ADMIN') {
+        // Not admin → redirect to home silently (don't reveal admin panel exists)
+        return NextResponse.redirect(new URL('/', request.url));
+      }
+    } catch (e) {
+      return NextResponse.redirect(new URL('/login', request.url));
     }
   }
 
