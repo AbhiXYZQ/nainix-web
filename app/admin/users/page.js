@@ -190,7 +190,10 @@ export default function AdminUsersPage() {
         {/* Role Filter */}
         <select value={roleFilter} onChange={e => { setRole(e.target.value); setPage(1); }}
           className="px-3 py-2.5 rounded-xl bg-white/3 border border-white/8 text-sm text-slate-300 outline-none focus:border-violet-500/40 cursor-pointer">
-          {ROLES.map(r => <option key={r} value={r} className="bg-[#0d0d1f]">{r === 'ALL' ? 'All Roles' : r}</option>)}
+          <option value="ALL" className="bg-[#0d0d1f]">All Roles</option>
+          <option value="CLIENT" className="bg-[#0d0d1f]">Clients</option>
+          <option value="FREELANCER" className="bg-[#0d0d1f]">Freelancers</option>
+          <option value="ADMIN" className="bg-[#0d0d1f]">Admins</option>
         </select>
 
         {/* Plan Filter */}

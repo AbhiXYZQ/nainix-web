@@ -30,7 +30,8 @@ export function middleware(request) {
     url === '/sitemap.xml' ||
     url === '/robots.txt';
 
-  if (!hasPreviewAccess && !isPublicBypass) {
+  const isDev = process.env.NODE_ENV === 'development';
+  if (!isDev && !hasPreviewAccess && !isPublicBypass) {
     return NextResponse.redirect(new URL('/coming-soon', request.url));
   }
   // ──────────────────────────────────────────────────────────────
