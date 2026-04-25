@@ -110,7 +110,7 @@ export async function GET(request) {
       { name: 'Admins',      value: adminCountRes.count      || 0 },
     ];
 
-    // ── User growth chart (last 14 days, group by day) ─────────
+    // ── User growth chart (last 14 days, cumulative) ─────────
     const growthMap = {};
     const todayUTC = new Date();
     
@@ -129,10 +129,18 @@ export async function GET(request) {
       }
     });
 
-    const userGrowth = Object.entries(growthMap).map(([date, users]) => ({
-      date: formatDate(date),
-      users,
-    }));
+    // Calculate cumulative total
+    const totalUsersNow = usersRes.count || 0;
+    const totalNewInWindow = (userGrowthRes.data || []).length;
+    let runningTotal = Math.max(0, totalUsersNow - totalNewInWindow);
+
+    const userGrowth = Object.entries(growthMap).map(([date, newCount]) => {
+      runningTotal += newCount;
+      return {
+        date: formatDate(date),
+        users: runningTotal,
+      };
+    });
 
     // ── Jobs per week ──────────────────────────────────────────
     const weekMap = {};
