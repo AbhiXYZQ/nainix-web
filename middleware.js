@@ -11,6 +11,30 @@ export function middleware(request) {
   const url = request.nextUrl.pathname;
   const ip = getClientIp(request);
 
+  // ─── Coming Soon Mode ──────────────────────────────────────────
+  // Block all public pages and redirect to /coming-soon
+  // EXCEPT: the coming-soon page itself, API routes, static assets, preview API
+  const PREVIEW_SECRET = process.env.PREVIEW_SECRET;
+  const previewCookie = request.cookies.get('nainix_preview')?.value;
+  const hasPreviewAccess = PREVIEW_SECRET && previewCookie === PREVIEW_SECRET;
+
+  const isPublicBypass =
+    url.startsWith('/api/') ||
+    url.startsWith('/_next/') ||
+    url.startsWith('/coming-soon') ||
+    url === '/favicon.ico' ||
+    url.endsWith('.png') ||
+    url.endsWith('.jpg') ||
+    url.endsWith('.svg') ||
+    url.endsWith('.ico') ||
+    url === '/sitemap.xml' ||
+    url === '/robots.txt';
+
+  if (!hasPreviewAccess && !isPublicBypass) {
+    return NextResponse.redirect(new URL('/coming-soon', request.url));
+  }
+  // ──────────────────────────────────────────────────────────────
+
   // --- Auth Redirect Phase ---
   // If already logged in, redirect away from auth pages
   if (url === '/login' || url === '/register') {
