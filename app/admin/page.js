@@ -95,12 +95,13 @@ export default function AdminOverviewPage() {
   useEffect(() => { fetchStats(); }, []);
 
   const kpiCards = [
-    { label: 'Total Users',      value: stats?.totalUsers,      icon: Users,     color: 'bg-violet-600',  sub: `${stats?.newUsersToday ?? 0} joined today` },
+    { label: 'Total Users',      value: stats?.totalUsers,      icon: Users,     color: 'bg-violet-600',  sub: `${stats?.newUsersToday ?? 0} joined in last 24h` },
     { label: 'Total Jobs',       value: stats?.totalJobs,       icon: Briefcase, color: 'bg-indigo-600',  sub: `${stats?.openJobs ?? 0} currently open` },
     { label: 'Total Proposals',  value: stats?.totalProposals,  icon: FileText,  color: 'bg-purple-600',  sub: `Across all jobs` },
     { label: 'Revenue (₹)',      value: stats?.totalRevenue != null ? `₹${stats.totalRevenue.toLocaleString('en-IN')}` : null, icon: CreditCard, color: 'bg-emerald-600', sub: `Total earnings` },
     { label: 'Collab Rooms',     value: stats?.totalCollab,     icon: Home,      color: 'bg-sky-600',     sub: `Active rooms` },
     { label: 'AI Pro Users',     value: stats?.aiProUsers,      icon: Sparkles,  color: 'bg-amber-600',   sub: `Paying subscribers` },
+    { label: 'Waitlist',         value: stats?.waitlistCount,   icon: Users,     color: 'bg-pink-600',    sub: `Pre-launch signups` },
   ];
 
   return (

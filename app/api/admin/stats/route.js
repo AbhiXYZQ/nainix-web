@@ -43,37 +43,40 @@ export async function GET(request) {
       paymentsRes,
       userGrowthRes,
       jobsWeeklyRes,
+      waitlistRes,
     ] = await Promise.all([
-      supabase.from('users').select('*', { count: 'exact', head: true }),
-      supabase.from('jobs').select('*', { count: 'exact', head: true }),
-      supabase.from('proposals').select('*', { count: 'exact', head: true }),
-      supabase.from('collab_rooms').select('*', { count: 'exact', head: true }),
+      // Use select('id') instead of head:true for accurate Supabase counts
+      supabase.from('users').select('id', { count: 'exact' }),
+      supabase.from('jobs').select('id', { count: 'exact' }),
+      supabase.from('proposals').select('id', { count: 'exact' }),
+      // Wrap optional tables so they don't crash Promise.all
+      supabase.from('collab_rooms').select('id', { count: 'exact' }).then(r => r).catch(() => ({ count: 0, data: [] })),
 
-      // Last 10 users (recent signups table)
+      // Last 10 users (recent signups)
       supabase.from('users')
         .select('id, name, email, role, created_at, monetization')
         .order('created_at', { ascending: false })
         .limit(10),
 
-      // New users today
+      // New users today (IST-aware: use last 24h instead of midnight)
       supabase.from('users')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', daysAgo(0)),
+        .select('id', { count: 'exact' })
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
 
       // Open jobs count
       supabase.from('jobs')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact' })
         .eq('status', 'OPEN'),
 
       // AI Pro users
       supabase.from('users')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact' })
         .eq('monetization->>plan', 'AI_PRO'),
 
-      // Total revenue from payments table
-      supabase.from('payments').select('amount'),
+      // Payments — optional table
+      supabase.from('payments').select('amount').then(r => r).catch(() => ({ data: [] })),
 
-      // User growth — last 14 days (group by day)
+      // User growth — last 14 days
       supabase.from('users')
         .select('created_at')
         .gte('created_at', daysAgo(14))
@@ -84,6 +87,9 @@ export async function GET(request) {
         .select('created_at')
         .gte('created_at', daysAgo(56))
         .order('created_at', { ascending: true }),
+
+      // Waitlist count
+      supabase.from('waitlist').select('id', { count: 'exact' }).then(r => r).catch(() => ({ count: 0 })),
     ]);
 
     // ── Total revenue ──────────────────────────────────────────
@@ -158,6 +164,7 @@ export async function GET(request) {
       newUsersToday:  newUsersTodayRes.count || 0,
       openJobs:       openJobsRes.count  || 0,
       aiProUsers:     aiProRes.count     || 0,
+      waitlistCount:  waitlistRes.count  || 0,
       totalRevenue,
       roleSplit,
       userGrowth,
